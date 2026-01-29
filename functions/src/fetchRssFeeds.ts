@@ -21,7 +21,7 @@ export const fetchRssFeeds = onSchedule({
     const promises = feedsSnapshot.docs.map(async (doc) => {
       const feedData = doc.data();
       const feedName = feedData.name;
-      const feedUrl = feedData.feed;
+      const feedUrl = feedData.url;
 
       if (!feedUrl) {
         console.warn(`Feed URL missing for ${feedName || doc.id}`);

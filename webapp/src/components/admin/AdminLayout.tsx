@@ -40,7 +40,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
   const { user, logout } = useAppStore();
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar */}
       <aside className="flex w-64 flex-col border-r border-border bg-sidebar">
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">

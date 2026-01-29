@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus,
   Pencil,
@@ -6,10 +6,14 @@ import {
   RefreshCw,
   Rss,
   Globe,
-  Power,
-  PowerOff,
+  Clock,
+  FileText,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useAdminStore } from '@/store/useAdminStore';
 import { Feed } from '@/data/adminMockData';
@@ -17,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -45,19 +48,22 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { z } from 'zod';
 
 const feedSchema = z.object({
   name: z.string().trim().min(1, 'Feed name is required').max(100, 'Name must be less than 100 characters'),
   url: z.string().trim().url('Please enter a valid URL'),
   type: z.enum(['rss', 'api']),
-  categoryId: z.string().min(1, 'Please select a category'),
 });
 
 export default function AdminFeeds() {
-  const { feeds, categories, addFeed, updateFeed, deleteFeed, toggleFeed, refreshFeed } =
+  const { feeds, feedsLoading, categories, subscribeToFeeds, addFeed, updateFeed, deleteFeed, refreshFeed } =
     useAdminStore();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToFeeds();
+    return () => unsubscribe();
+  }, [subscribeToFeeds]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -70,7 +76,6 @@ export default function AdminFeeds() {
     name: '',
     url: '',
     type: 'rss' as 'rss' | 'api',
-    categoryId: '',
   });
 
   const allCategories = categories.flatMap((cat) => [
@@ -86,12 +91,40 @@ export default function AdminFeeds() {
     return allCategories.find((c) => c.id === id)?.name || id;
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'error':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'running':
+        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'success':
+        return <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">Success</Badge>;
+      case 'error':
+        return <Badge variant="destructive">Error</Badge>;
+      case 'running':
+        return <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-blue-500/20">Running</Badge>;
+      case 'pending':
+        return <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">Pending</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   const resetForm = () => {
-    setFormData({ name: '', url: '', type: 'rss', categoryId: '' });
+    setFormData({ name: '', url: '', type: 'rss' });
     setErrors({});
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const result = feedSchema.safeParse(formData);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -104,46 +137,59 @@ export default function AdminFeeds() {
       return;
     }
 
-    addFeed({
-      name: result.data.name,
-      url: result.data.url,
-      type: result.data.type,
-      categoryId: result.data.categoryId,
-      enabled: true,
-    });
-    toast.success('Feed created');
-    setIsCreateOpen(false);
-    resetForm();
-  };
-
-  const handleEdit = () => {
-    const result = feedSchema.safeParse(formData);
-    if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
-        if (err.path[0]) {
-          fieldErrors[err.path[0] as string] = err.message;
-        }
+    try {
+      await addFeed({
+        name: result.data.name,
+        url: result.data.url,
+        type: result.data.type,
       });
-      setErrors(fieldErrors);
-      return;
-    }
-
-    if (selectedFeed) {
-      updateFeed(selectedFeed.id, result.data);
-      toast.success('Feed updated');
-      setIsEditOpen(false);
-      setSelectedFeed(null);
+      toast.success('Feed created');
+      setIsCreateOpen(false);
       resetForm();
+    } catch (error) {
+      console.error('Error creating feed:', error);
+      toast.error('Failed to create feed');
     }
   };
 
-  const handleDelete = () => {
+  const handleEdit = async () => {
+    const result = feedSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[err.path[0] as string] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     if (selectedFeed) {
-      deleteFeed(selectedFeed.id);
-      toast.success('Feed deleted');
-      setIsDeleteOpen(false);
-      setSelectedFeed(null);
+      try {
+        await updateFeed(selectedFeed.id, result.data);
+        toast.success('Feed updated');
+        setIsEditOpen(false);
+        setSelectedFeed(null);
+        resetForm();
+      } catch (error) {
+        console.error('Error updating feed:', error);
+        toast.error('Failed to update feed');
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (selectedFeed) {
+      try {
+        await deleteFeed(selectedFeed.id);
+        toast.success('Feed deleted');
+        setIsDeleteOpen(false);
+        setSelectedFeed(null);
+      } catch (error) {
+        console.error('Error deleting feed:', error);
+        toast.error('Failed to delete feed');
+      }
     }
   };
 
@@ -158,7 +204,6 @@ export default function AdminFeeds() {
       name: feed.name,
       url: feed.url,
       type: feed.type,
-      categoryId: feed.categoryId,
     });
     setErrors({});
     setIsEditOpen(true);
@@ -192,89 +237,89 @@ export default function AdminFeeds() {
             <CardTitle>Active Feeds</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {feeds.map((feed) => (
-                <div
-                  key={feed.id}
-                  className={cn(
-                    'group flex items-center gap-4 rounded-lg border border-border p-4 transition-soft',
-                    !feed.enabled && 'opacity-60'
-                  )}
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                    {feed.type === 'rss' ? (
-                      <Rss className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Globe className="h-5 w-5 text-primary" />
-                    )}
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{feed.name}</h3>
-                      <Badge variant={feed.type === 'rss' ? 'default' : 'secondary'}>
-                        {feed.type.toUpperCase()}
-                      </Badge>
-                      {!feed.enabled && (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          Disabled
-                        </Badge>
+            {feedsLoading ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                Loading feeds...
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {feeds.map((feed) => (
+                  <div
+                    key={feed.id}
+                    className="group flex items-center gap-4 rounded-lg border border-border p-4 transition-soft"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                      {feed.type === 'rss' ? (
+                        <Rss className="h-5 w-5 text-primary" />
+                      ) : (
+                        <Globe className="h-5 w-5 text-primary" />
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {getCategoryName(feed.categoryId)} • {feed.articleCount} articles
-                    </p>
-                    {feed.lastRefreshed && (
-                      <p className="text-xs text-muted-foreground">
-                        Last refreshed{' '}
-                        {formatDistanceToNow(feed.lastRefreshed, { addSuffix: true })}
-                      </p>
-                    )}
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={feed.enabled}
-                      onCheckedChange={() => toggleFeed(feed.id)}
-                    />
-                  </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{feed.name}</h3>
+                        <Badge variant={feed.type === 'rss' ? 'default' : 'secondary'}>
+                          {feed.type.toUpperCase()}
+                        </Badge>
+                        {getStatusBadge(feed.status)}
+                      </div>
+                      {feed.categoryId && (
+                        <p className="text-sm text-muted-foreground">
+                          {getCategoryName(feed.categoryId)}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          {feed.fresh_articles_count} fresh articles
+                        </span>
+                        {feed.last_runtime && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Last run {formatDistanceToNow(feed.last_runtime, { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="flex items-center gap-1 opacity-0 transition-soft group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleRefresh(feed)}
-                      disabled={!feed.enabled}
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEdit(feed)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => openDelete(feed)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1 opacity-0 transition-soft group-hover:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleRefresh(feed)}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEdit(feed)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => openDelete(feed)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {feeds.length === 0 && (
-                <div className="py-8 text-center text-muted-foreground">
-                  No feeds configured. Add your first feed to start ingesting articles.
-                </div>
-              )}
-            </div>
+                {feeds.length === 0 && (
+                  <div className="py-8 text-center text-muted-foreground">
+                    No feeds configured. Add your first feed to start ingesting articles.
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -350,31 +395,6 @@ export default function AdminFeeds() {
                   <SelectItem value="api">API Endpoint</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="feed-category">Category</Label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(value) => {
-                  setFormData({ ...formData, categoryId: value });
-                  setErrors({ ...errors, categoryId: '' });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.categoryId && (
-                <p className="text-sm text-destructive">{errors.categoryId}</p>
-              )}
             </div>
           </div>
           <DialogFooter>

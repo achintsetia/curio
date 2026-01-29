@@ -42,6 +42,12 @@ service cloud.firestore {
       }
     }
     
+    // Feeds - only admins can read and write
+    match /feeds/{feedId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+    
     // Default deny all other access
     match /{document=**} {
       allow read, write: if false;

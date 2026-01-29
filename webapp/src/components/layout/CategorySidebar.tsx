@@ -1,8 +1,7 @@
-import { ChevronRight, ChevronDown, Folder, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronRight, ChevronDown, Folder, FileText, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Category } from '@/types';
-import { mockCategories } from '@/data/mockData';
 import { useAppStore } from '@/store/useAppStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ interface CategoryItemProps {
 }
 
 function CategoryItem({ category, level = 0 }: CategoryItemProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const { selectedCategoryId, setSelectedCategory, isSubscribed, sidebarOpen } = useAppStore();
   const hasSubcategories = category.subcategories && category.subcategories.length > 0;
   const isSelected = selectedCategoryId === category.id;
@@ -75,10 +74,15 @@ function CategoryItem({ category, level = 0 }: CategoryItemProps) {
 }
 
 export function CategorySidebar() {
-  const { sidebarOpen, selectedCategoryId, setSelectedCategory } = useAppStore();
+  const { sidebarOpen, selectedCategoryId, setSelectedCategory, categories, fetchCategoriesTree, isCategoriesLoading } = useAppStore();
+
+  useEffect(() => {
+    fetchCategoriesTree();
+  }, [fetchCategoriesTree]);
+
   const selectedCategory = selectedCategoryId
-    ? mockCategories.find((c) => c.id === selectedCategoryId) ||
-      mockCategories.flatMap((c) => c.subcategories || []).find((s) => s.id === selectedCategoryId)
+    ? categories.find((c) => c.id === selectedCategoryId) ||
+    categories.flatMap((c) => c.subcategories || []).find((s) => s.id === selectedCategoryId)
     : null;
 
   if (!sidebarOpen) {
@@ -114,11 +118,17 @@ export function CategorySidebar() {
             All Articles
           </Button>
 
-          <div className="space-y-1">
-            {mockCategories.map((category) => (
-              <CategoryItem key={category.id} category={category} />
-            ))}
-          </div>
+          {isCategoriesLoading ? (
+            <div className="flex justify-center p-4">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {categories.map((category) => (
+                <CategoryItem key={category.id} category={category} />
+              ))}
+            </div>
+          )}
         </div>
       </ScrollArea>
 

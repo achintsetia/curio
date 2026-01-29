@@ -5,10 +5,10 @@ export interface Feed {
   name: string;
   url: string;
   type: 'rss' | 'api';
-  categoryId: string;
-  enabled: boolean;
-  lastRefreshed: Date | null;
-  articleCount: number;
+  categoryId?: string;
+  fresh_articles_count: number;
+  last_runtime: Date | null;
+  status: string;
 }
 
 export interface AdminNotification {
@@ -20,58 +20,7 @@ export interface AdminNotification {
   recipientCount: number;
 }
 
-export const mockFeeds: Feed[] = [
-  {
-    id: 'feed-1',
-    name: 'TechCrunch AI',
-    url: 'https://techcrunch.com/category/ai/feed/',
-    type: 'rss',
-    categoryId: 'tech-ai',
-    enabled: true,
-    lastRefreshed: new Date('2025-01-29T08:00:00'),
-    articleCount: 45,
-  },
-  {
-    id: 'feed-2',
-    name: 'Dev.to Web Dev',
-    url: 'https://dev.to/feed/tag/webdev',
-    type: 'rss',
-    categoryId: 'tech-web',
-    enabled: true,
-    lastRefreshed: new Date('2025-01-29T07:30:00'),
-    articleCount: 120,
-  },
-  {
-    id: 'feed-3',
-    name: 'Space.com RSS',
-    url: 'https://www.space.com/feeds/all',
-    type: 'rss',
-    categoryId: 'sci-space',
-    enabled: true,
-    lastRefreshed: new Date('2025-01-29T06:00:00'),
-    articleCount: 89,
-  },
-  {
-    id: 'feed-4',
-    name: 'Bloomberg Markets API',
-    url: 'https://api.bloomberg.com/markets',
-    type: 'api',
-    categoryId: 'biz-markets',
-    enabled: false,
-    lastRefreshed: new Date('2025-01-28T12:00:00'),
-    articleCount: 234,
-  },
-  {
-    id: 'feed-5',
-    name: 'Reuters World News',
-    url: 'https://www.reuters.com/rssFeed/worldNews',
-    type: 'rss',
-    categoryId: 'world',
-    enabled: true,
-    lastRefreshed: new Date('2025-01-29T05:00:00'),
-    articleCount: 167,
-  },
-];
+// Feeds are now fetched from Firestore
 
 export const mockNotifications: AdminNotification[] = [
   {

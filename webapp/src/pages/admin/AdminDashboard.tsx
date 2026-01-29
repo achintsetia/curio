@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { FolderTree, Rss, FileText, Bell, TrendingUp, Users } from 'lucide-react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,15 +6,24 @@ import { useAdminStore } from '@/store/useAdminStore';
 import { useAppStore } from '@/store/useAppStore';
 
 export default function AdminDashboard() {
-  const { categories, feeds, notifications } = useAdminStore();
-  const { articles } = useAppStore();
+  const { feeds, notifications, subscribeToFeeds } = useAdminStore();
+  const { articles, categories, fetchCategoriesTree } = useAppStore();
+
+  useEffect(() => {
+    const unsubscribeFeeds = subscribeToFeeds();
+    fetchCategoriesTree();
+    return () => {
+      unsubscribeFeeds();
+    };
+  }, [subscribeToFeeds, fetchCategoriesTree]);
 
   const totalCategories = categories.reduce(
     (acc, cat) => acc + 1 + (cat.subcategories?.length || 0),
     0
   );
 
-  const activeFeeds = feeds.filter((f) => f.enabled).length;
+  const successFeeds = feeds.filter((f) => f.status === 'success').length;
+  const errorFeeds = feeds.filter((f) => f.status === 'error' || f.status === 'failed').length;
 
   const stats = [
     {
@@ -23,10 +33,10 @@ export default function AdminDashboard() {
       description: `${categories.length} parent categories`,
     },
     {
-      title: 'Active Feeds',
-      value: activeFeeds,
+      title: 'Total Feeds',
+      value: feeds.length,
       icon: Rss,
-      description: `${feeds.length - activeFeeds} disabled`,
+      description: `${successFeeds} active, ${errorFeeds} with errors`,
     },
     {
       title: 'Total Articles',
@@ -41,6 +51,20 @@ export default function AdminDashboard() {
       description: 'All time',
     },
   ];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'success':
+        return 'bg-green-500';
+      case 'error':
+      case 'failed':
+        return 'bg-red-500';
+      case 'running':
+        return 'bg-blue-500';
+      default:
+        return 'bg-yellow-500';
+    }
+  };
 
   return (
     <AdminLayout
@@ -91,6 +115,11 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+                {notifications.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No notifications yet
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -111,18 +140,20 @@ export default function AdminDashboard() {
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={cn(
-                          'h-2 w-2 rounded-full',
-                          feed.enabled ? 'bg-green-500' : 'bg-muted-foreground'
-                        )}
+                        className={`h-2 w-2 rounded-full ${getStatusColor(feed.status)}`}
                       />
                       <span className="text-sm font-medium">{feed.name}</span>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {feed.articleCount} articles
+                      {feed.fresh_articles_count} fresh articles
                     </span>
                   </div>
                 ))}
+                {feeds.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No feeds configured
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -132,6 +163,3 @@ export default function AdminDashboard() {
   );
 }
 
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
-}

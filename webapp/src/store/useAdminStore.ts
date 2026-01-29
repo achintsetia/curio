@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
-import { db } from '@/firebase';
+import { db, functions } from '@/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { Category } from '@/types';
-import { Feed, AdminNotification, mockFeeds, mockNotifications } from '@/data/adminMockData';
+import { Feed, AdminNotification, mockNotifications } from '@/data/adminMockData';
 
 interface AdminState {
   // Categories
@@ -16,10 +17,11 @@ interface AdminState {
 
   // Feeds
   feeds: Feed[];
-  addFeed: (feed: Omit<Feed, 'id' | 'lastRefreshed' | 'articleCount'>) => void;
-  updateFeed: (id: string, updates: Partial<Feed>) => void;
-  deleteFeed: (id: string) => void;
-  toggleFeed: (id: string) => void;
+  feedsLoading: boolean;
+  subscribeToFeeds: () => () => void;
+  addFeed: (feed: Omit<Feed, 'id' | 'last_runtime' | 'fresh_articles_count' | 'status'>) => Promise<void>;
+  updateFeed: (id: string, updates: Partial<Feed>) => Promise<void>;
+  deleteFeed: (id: string) => Promise<void>;
   refreshFeed: (id: string) => void;
 
   // Notifications
@@ -34,32 +36,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   fetchCategories: async () => {
     set({ categoriesLoading: true });
     try {
-      const categoriesRef = collection(db, 'categories');
-      const snapshot = await getDocs(categoriesRef);
-      const categories: Category[] = [];
-
-      for (const docSnap of snapshot.docs) {
-        const data = docSnap.data();
-        const category: Category = {
-          id: docSnap.id,
-          name: data.name,
-          slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
-          subcategories: [],
-        };
-
-        // Fetch subcategories
-        const subcategoriesRef = collection(db, 'categories', docSnap.id, 'subcategories');
-        const subSnapshot = await getDocs(subcategoriesRef);
-        category.subcategories = subSnapshot.docs.map(subDoc => ({
-          id: subDoc.id,
-          name: subDoc.data().name,
-          slug: subDoc.data().slug || subDoc.data().name.toLowerCase().replace(/\s+/g, '-'),
-        }));
-
-        categories.push(category);
-      }
-
-      set({ categories, categoriesLoading: false });
+      const getCategoryTree = httpsCallable(functions, 'getCategoryTree');
+      const result = await getCategoryTree();
+      const data = result.data as { categories: Category[] };
+      set({ categories: data.categories || [], categoriesLoading: false });
     } catch (error) {
       console.error('Error fetching categories:', error);
       set({ categoriesLoading: false });
@@ -173,46 +153,74 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
   },
 
-  feeds: mockFeeds,
+  feeds: [],
+  feedsLoading: true,
 
-  addFeed: (feed) =>
-    set((state) => ({
-      feeds: [
-        ...state.feeds,
-        {
-          ...feed,
-          id: `feed-${Date.now()}`,
-          lastRefreshed: null,
-          articleCount: 0,
-        },
-      ],
-    })),
+  subscribeToFeeds: () => {
+    const feedsRef = collection(db, 'feeds');
+    const unsubscribe = onSnapshot(feedsRef, (snapshot) => {
+      const feeds: Feed[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          name: data.name || '',
+          url: data.url || '',
+          type: (data.type as 'rss' | 'api') || 'rss',
+          categoryId: data.categoryId || '',
+          fresh_articles_count: data.fresh_articles_count || 0,
+          last_runtime: data.last_runtime?.toDate?.() || null,
+          status: data.status || 'unknown',
+        };
+      });
+      set({ feeds, feedsLoading: false });
+    }, (error) => {
+      console.error('Error fetching feeds:', error);
+      set({ feedsLoading: false });
+    });
+    return unsubscribe;
+  },
 
-  updateFeed: (id, updates) =>
-    set((state) => ({
-      feeds: state.feeds.map((feed) =>
-        feed.id === id ? { ...feed, ...updates } : feed
-      ),
-    })),
+  addFeed: async (feed) => {
+    try {
+      const feedsRef = collection(db, 'feeds');
+      const newFeedRef = doc(feedsRef);
+      await setDoc(newFeedRef, {
+        ...feed,
+        fresh_articles_count: 0,
+        last_runtime: null,
+        status: 'pending',
+        createdAt: new Date(),
+      });
+    } catch (error) {
+      console.error('Error adding feed:', error);
+      throw error;
+    }
+  },
 
-  deleteFeed: (id) =>
-    set((state) => ({
-      feeds: state.feeds.filter((feed) => feed.id !== id),
-    })),
+  updateFeed: async (id, updates) => {
+    try {
+      const feedRef = doc(db, 'feeds', id);
+      await updateDoc(feedRef, { ...updates, updatedAt: new Date() });
+    } catch (error) {
+      console.error('Error updating feed:', error);
+      throw error;
+    }
+  },
 
-  toggleFeed: (id) =>
-    set((state) => ({
-      feeds: state.feeds.map((feed) =>
-        feed.id === id ? { ...feed, enabled: !feed.enabled } : feed
-      ),
-    })),
+  deleteFeed: async (id) => {
+    try {
+      const feedRef = doc(db, 'feeds', id);
+      await deleteDoc(feedRef);
+    } catch (error) {
+      console.error('Error deleting feed:', error);
+      throw error;
+    }
+  },
 
-  refreshFeed: (id) =>
-    set((state) => ({
-      feeds: state.feeds.map((feed) =>
-        feed.id === id ? { ...feed, lastRefreshed: new Date() } : feed
-      ),
-    })),
+  refreshFeed: (id) => {
+    // This could trigger a cloud function in the future
+    console.log('Refresh feed:', id);
+  },
 
   notifications: mockNotifications,
 

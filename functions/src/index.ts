@@ -32,3 +32,6 @@ setGlobalOptions({maxInstances: 10, region: "asia-south1"});
 // });
 export * from "./fetchRssFeeds";
 export * from "./cleanupData";
+export * from "./getCategoryTree";
+export * from "./getRawNewsArticles";
+

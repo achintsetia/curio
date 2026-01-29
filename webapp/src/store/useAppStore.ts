@@ -3,7 +3,9 @@ import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Article, User } from '@/types';
 import { mockArticles } from '@/data/mockData';
-import { auth, db } from '@/firebase';
+import { auth, db, functions } from '@/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { Category } from '@/types';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -18,7 +20,13 @@ interface AppState {
   sidebarOpen: boolean;
 
   // Articles
+  // Articles
   articles: Article[];
+
+  // Categories
+  categories: Category[];
+  isCategoriesLoading: boolean;
+  fetchCategoriesTree: () => Promise<void>;
 
   // Actions
   login: () => Promise<void>;
@@ -103,6 +111,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedCategoryId: null,
   sidebarOpen: true,
   articles: mockArticles,
+  categories: [],
+  isCategoriesLoading: false,
+
+  fetchCategoriesTree: async () => {
+    set({ isCategoriesLoading: true });
+    try {
+      const getCategoryTree = httpsCallable(functions, 'getCategoryTree');
+      const result = await getCategoryTree();
+      const data = result.data as { categories: Category[] };
+      set({ categories: data.categories || [], isCategoriesLoading: false });
+    } catch (error) {
+      console.error('Error fetching categories tree:', error);
+      set({ categories: [], isCategoriesLoading: false });
+    }
+  },
 
   // Actions
   login: async () => {
