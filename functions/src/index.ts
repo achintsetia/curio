@@ -31,3 +31,4 @@ setGlobalOptions({maxInstances: 10, region: "asia-south1"});
 //   response.send("Hello from Firebase!");
 // });
 export * from "./fetchRssFeeds";
+export * from "./cleanupData";

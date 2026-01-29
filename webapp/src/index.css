@@ -1,0 +1,197 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Warm, calm color palette */
+    --background: 40 33% 98%;
+    --foreground: 220 20% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
+
+    /* Deep teal primary */
+    --primary: 175 42% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Soft secondary */
+    --secondary: 40 20% 94%;
+    --secondary-foreground: 220 20% 25%;
+
+    /* Muted tones */
+    --muted: 40 15% 92%;
+    --muted-foreground: 220 10% 50%;
+
+    /* Accent - warm amber */
+    --accent: 35 90% 55%;
+    --accent-foreground: 220 20% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 175 42% 35%;
+
+    --radius: 0.625rem;
+
+    /* Sidebar - slightly cooler */
+    --sidebar-background: 210 15% 97%;
+    --sidebar-foreground: 220 20% 25%;
+    --sidebar-primary: 175 42% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 175 30% 95%;
+    --sidebar-accent-foreground: 175 42% 30%;
+    --sidebar-border: 210 15% 90%;
+    --sidebar-ring: 175 42% 35%;
+
+    /* Custom tokens for Curio */
+    --unread-indicator: 175 50% 45%;
+    --read-overlay: 0 0% 100% / 0.6;
+    --card-shadow: 220 20% 20% / 0.04;
+    --card-shadow-hover: 220 20% 20% / 0.08;
+    --nav-height: 4rem;
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 40 20% 95%;
+
+    --card: 220 18% 14%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 220 18% 14%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 175 50% 50%;
+    --primary-foreground: 220 20% 10%;
+
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 40 20% 90%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 40 10% 60%;
+
+    --accent: 35 80% 55%;
+    --accent-foreground: 220 20% 10%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 175 50% 50%;
+
+    --sidebar-background: 220 18% 12%;
+    --sidebar-foreground: 40 15% 90%;
+    --sidebar-primary: 175 50% 50%;
+    --sidebar-primary-foreground: 220 20% 10%;
+    --sidebar-accent: 175 30% 20%;
+    --sidebar-accent-foreground: 175 40% 70%;
+    --sidebar-border: 220 15% 20%;
+    --sidebar-ring: 175 50% 50%;
+
+    --unread-indicator: 175 60% 55%;
+    --read-overlay: 0 0% 0% / 0.3;
+    --card-shadow: 0 0% 0% / 0.2;
+    --card-shadow-hover: 0 0% 0% / 0.3;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .font-body {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Article card states */
+  .article-unread {
+    @apply border-l-4 border-l-primary bg-card;
+  }
+
+  .article-read {
+    @apply opacity-70 bg-muted/30;
+  }
+
+  /* Smooth transitions */
+  .transition-soft {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  /* Custom scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full hover:bg-muted-foreground/30;
+  }
+
+  /* Focus states */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+/* Animation keyframes */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slide-in-left 0.25s ease-out forwards;
+}

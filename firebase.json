@@ -35,6 +35,9 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "predeploy": [
+      "npm --prefix webapp run build"
     ]
   },
   "storage": {

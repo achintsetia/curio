@@ -31,6 +31,8 @@ export const fetchRssFeeds = onSchedule({
       try {
         const feed = await parser.parseURL(feedUrl);
 
+        let newArticlesCount = 0;
+
         const articlePromises = feed.items.map(async (item) => {
           // data preparation
           const newsItem = {
@@ -50,13 +52,22 @@ export const fetchRssFeeds = onSchedule({
           // MD5 is fast and sufficient for this purpose
           const docId = crypto.createHash("md5").update(newsItem.link).digest("hex");
 
-          // Use .set() with { merge: true } to handle deduplication automatically within Firestore
-          // This avoids the cost of a read before write
-          await db.collection("rawnews").doc(docId).set(newsItem, {merge: true});
+          try {
+            // Use .create() to ensure we only add NEW articles.
+            // If it exists, it throws ALREADY_EXISTS error, which we catch.
+            await db.collection("rawnews").doc(docId).create(newsItem);
+            newArticlesCount++;
+          } catch (error: any) {
+            if (error.code === 6 || error.code === "ALREADY_EXISTS") {
+              // Document already exists, ignore
+            } else {
+              console.error(`Error adding article ${newsItem.title}:`, error);
+            }
+          }
         });
 
         await Promise.all(articlePromises);
-        console.log(`Processed ${feed.items.length} articles from ${feedName}`);
+        console.log(`Fetched ${feed.items.length} items from ${feedName}. Added ${newArticlesCount} new articles.`);
       } catch (err) {
         console.error(`Error parsing feed ${feedName} (${feedUrl}):`, err);
       }
