@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
-import { db, functions } from '@/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '@/firebase';
 import { Category } from '@/types';
 import { Feed, AdminNotification, mockNotifications } from '@/data/adminMockData';
 
@@ -36,9 +35,9 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   fetchCategories: async () => {
     set({ categoriesLoading: true });
     try {
-      const getCategoryTree = httpsCallable(functions, 'getCategoryTree');
-      const result = await getCategoryTree();
-      const data = result.data as { categories: Category[] };
+      const response = await fetch('https://asia-south1-curio-6b4c5.cloudfunctions.net/getCategoryTree');
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      const data = await response.json() as { categories: Category[] };
       set({ categories: data.categories || [], categoriesLoading: false });
     } catch (error) {
       console.error('Error fetching categories:', error);

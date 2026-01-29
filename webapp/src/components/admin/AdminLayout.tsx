@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FolderTree,
@@ -37,6 +37,7 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, title, description }: AdminLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAppStore();
 
   return (
@@ -119,7 +120,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.location.href = '/'}>
+                <DropdownMenuItem onClick={() => navigate('/')}>
                   Back to Reader
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

@@ -3,8 +3,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Article, User } from '@/types';
 import { mockArticles } from '@/data/mockData';
-import { auth, db, functions } from '@/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { auth, db } from '@/firebase';
 import { Category } from '@/types';
 
 const googleProvider = new GoogleAuthProvider();
@@ -117,9 +116,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchCategoriesTree: async () => {
     set({ isCategoriesLoading: true });
     try {
-      const getCategoryTree = httpsCallable(functions, 'getCategoryTree');
-      const result = await getCategoryTree();
-      const data = result.data as { categories: Category[] };
+      const response = await fetch('https://asia-south1-curio-6b4c5.cloudfunctions.net/getCategoryTree');
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      const data = await response.json() as { categories: Category[] };
       set({ categories: data.categories || [], isCategoriesLoading: false });
     } catch (error) {
       console.error('Error fetching categories tree:', error);

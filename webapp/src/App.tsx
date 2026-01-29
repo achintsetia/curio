@@ -12,6 +12,7 @@ import AdminFeeds from "./pages/admin/AdminFeeds";
 import AdminArticles from "./pages/admin/AdminArticles";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import { useAppStore } from "./store/useAppStore";
+import { AdminRoute } from "./components/AdminRoute";
 
 const queryClient = new QueryClient();
 
@@ -40,11 +41,46 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/categories" element={<AdminCategories />} />
-            <Route path="/admin/feeds" element={<AdminFeeds />} />
-            <Route path="/admin/articles" element={<AdminArticles />} />
-            <Route path="/admin/notifications" element={<AdminNotifications />} />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/categories"
+              element={
+                <AdminRoute>
+                  <AdminCategories />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/feeds"
+              element={
+                <AdminRoute>
+                  <AdminFeeds />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/articles"
+              element={
+                <AdminRoute>
+                  <AdminArticles />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications"
+              element={
+                <AdminRoute>
+                  <AdminNotifications />
+                </AdminRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

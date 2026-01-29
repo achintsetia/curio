@@ -11,7 +11,10 @@ import {
 import { useAppStore } from '@/store/useAppStore';
 import { getCategoryById } from '@/data/mockData';
 
+import { useNavigate } from 'react-router-dom';
+
 export function TopNavBar() {
+  const navigate = useNavigate();
   const {
     user,
     isAuthenticated,
@@ -111,7 +114,7 @@ export function TopNavBar() {
                 <DropdownMenuSeparator />
                 {user.is_admin && (
                   <>
-                    <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
+                    <DropdownMenuItem onClick={() => navigate('/admin')}>
                       Admin Dashboard
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

@@ -1,4 +1,4 @@
-import {onSchedule} from "firebase-functions/v2/scheduler";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import Parser from "rss-parser";
 
@@ -34,13 +34,22 @@ export const fetchRssFeeds = onSchedule({
         let newArticlesCount = 0;
 
         const articlePromises = feed.items.map(async (item) => {
+          const timestamp = item.pubDate ? new Date(item.pubDate) : new Date();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          if (timestamp < thirtyDaysAgo) {
+            return;
+          }
+
           // data preparation
           const newsItem = {
             source: feedName || "Unknown",
             title: item.title || "No Title",
-            timestamp: item.pubDate ? new Date(item.pubDate) : new Date(),
+            timestamp: timestamp,
             link: item.link || "",
             summary: item.contentSnippet || item.summary || "",
+            content: item.content || "",
             isProcessed: false,
           };
 

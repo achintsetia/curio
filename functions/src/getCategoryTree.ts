@@ -1,4 +1,4 @@
-import {onCall} from "firebase-functions/v2/https";
+import {onRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import {onDocumentWritten} from "firebase-functions/v2/firestore";
 
@@ -22,53 +22,71 @@ interface SubcategoryData {
 }
 
 /**
- * Callable function to get the full category tree.
+ * HTTP function to get the full category tree.
  * Checks Firestore cache first.
+ * JSON API compatible.
  */
-export const getCategoryTree = onCall(async (_request) => {
-  const cacheRef = db.collection("cache").doc("categoryTree");
-  const cacheDoc = await cacheRef.get();
+export const getCategoryTree = onRequest({cors: true}, async (_req, res) => {
+  try {
+    const cacheRef = db.collection("cache").doc("categoryTree");
+    const cacheDoc = await cacheRef.get();
 
-  if (cacheDoc.exists) {
-    return cacheDoc.data();
-  }
+    if (cacheDoc.exists) {
+      res.json(cacheDoc.data());
+      return;
+    }
 
-  // Cache miss - build the tree
-  const categoriesSnapshot = await db.collection("categories").get();
-  const tree: CategoryData[] = [];
+    // Cache miss - build the tree
+    const categoriesSnapshot = await db.collection("categories").get();
+    const tree: CategoryData[] = [];
 
-  // Use Promise.all for parallel subcategory fetching
-  await Promise.all(categoriesSnapshot.docs.map(async (doc) => {
-    const catData = doc.data();
-    const subSnapshot = await db.collection("categories").doc(doc.id).collection("subcategories").get();
+    // Use Promise.all for parallel subcategory fetching
+    await Promise.all(categoriesSnapshot.docs.map(async (doc) => {
+      const catData = doc.data();
+      const subSnapshot = await db.collection("categories").doc(doc.id).collection("subcategories").get();
 
-    const subcategories: SubcategoryData[] = subSnapshot.docs.map((sub) => ({
-      id: sub.id,
-      name: sub.data().name,
-      slug: sub.data().slug,
+      const subcategories: SubcategoryData[] = subSnapshot.docs.map((sub) => ({
+        id: sub.id,
+        name: sub.data().name,
+        slug: sub.data().slug,
+      }));
+
+      tree.push({
+        id: doc.id,
+        name: catData.name,
+        slug: catData.slug,
+        subcategories,
+      });
     }));
 
-    tree.push({
-      id: doc.id,
-      name: catData.name,
-      slug: catData.slug,
-      subcategories,
-    });
-  }));
+    // Sort alphabetically by name for consistency
+    tree.sort((a, b) => a.name.localeCompare(b.name));
+    tree.forEach((cat) => cat.subcategories.sort((a, b) => a.name.localeCompare(b.name)));
 
-  // Sort alphabetically by name for consistency
-  tree.sort((a, b) => a.name.localeCompare(b.name));
-  tree.forEach((cat) => cat.subcategories.sort((a, b) => a.name.localeCompare(b.name)));
+    const result = {
+      categories: tree,
+      lastUpdate: admin.firestore.FieldValue.serverTimestamp(), // This will be server timestamp
+    };
 
-  const result = {
-    categories: tree,
-    lastUpdate: admin.firestore.FieldValue.serverTimestamp(),
-  };
+    // Save to cache (we need to convert serverTimestamp for JSON response or just return Date)
+    // Firestore stores it as Timestamp, res.json handles it? NO.
+    // serverTimestamp is a sentinel. We should save it, but return a concrete date in response if possible.
+    // Or just save it and fetch it back?
+    await cacheRef.set(result);
+    // Fetch it back to get the resolved timestamp or just return current date
+    const finalResult = {
+      ...result,
+      lastUpdate: new Date().toISOString(),
+    };
 
-  // Save to cache
-  await cacheRef.set(result);
+    // Check if we need to return the saved timestamp or just now.
+    // Since we just saved it, 'now' is close enough.
 
-  return result;
+    res.json(finalResult);
+  } catch (error) {
+    console.error("Error fetching category tree:", error);
+    res.status(500).json({error: "Internal Server Error"});
+  }
 });
 
 /**
