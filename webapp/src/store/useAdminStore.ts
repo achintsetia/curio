@@ -1,14 +1,18 @@
 import { create } from 'zustand';
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
+import { db } from '@/firebase';
 import { Category } from '@/types';
-import { mockCategories } from '@/data/mockData';
 import { Feed, AdminNotification, mockFeeds, mockNotifications } from '@/data/adminMockData';
 
 interface AdminState {
   // Categories
   categories: Category[];
-  addCategory: (name: string, parentId?: string) => void;
-  updateCategory: (id: string, name: string) => void;
-  deleteCategory: (id: string) => void;
+  categoriesLoading: boolean;
+  fetchCategories: () => Promise<void>;
+  subscribeToCategories: () => () => void;
+  addCategory: (name: string, parentId?: string) => Promise<void>;
+  updateCategory: (id: string, name: string, parentId?: string) => Promise<void>;
+  deleteCategory: (id: string, parentId?: string) => Promise<void>;
 
   // Feeds
   feeds: Feed[];
@@ -23,54 +27,151 @@ interface AdminState {
   sendNotification: (notification: Omit<AdminNotification, 'id' | 'sentAt' | 'recipientCount'>) => void;
 }
 
-export const useAdminStore = create<AdminState>((set) => ({
-  categories: mockCategories,
+export const useAdminStore = create<AdminState>((set, get) => ({
+  categories: [],
+  categoriesLoading: true,
 
-  addCategory: (name, parentId) =>
-    set((state) => {
-      const newCategory: Category = {
-        id: `cat-${Date.now()}`,
-        name,
-        slug: name.toLowerCase().replace(/\s+/g, '-'),
-      };
+  fetchCategories: async () => {
+    set({ categoriesLoading: true });
+    try {
+      const categoriesRef = collection(db, 'categories');
+      const snapshot = await getDocs(categoriesRef);
+      const categories: Category[] = [];
 
-      if (parentId) {
-        return {
-          categories: state.categories.map((cat) =>
-            cat.id === parentId
-              ? { ...cat, subcategories: [...(cat.subcategories || []), newCategory] }
-              : cat
-          ),
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        const category: Category = {
+          id: docSnap.id,
+          name: data.name,
+          slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
+          subcategories: [],
         };
+
+        // Fetch subcategories
+        const subcategoriesRef = collection(db, 'categories', docSnap.id, 'subcategories');
+        const subSnapshot = await getDocs(subcategoriesRef);
+        category.subcategories = subSnapshot.docs.map(subDoc => ({
+          id: subDoc.id,
+          name: subDoc.data().name,
+          slug: subDoc.data().slug || subDoc.data().name.toLowerCase().replace(/\s+/g, '-'),
+        }));
+
+        categories.push(category);
       }
 
-      return { categories: [...state.categories, { ...newCategory, subcategories: [] }] };
-    }),
+      set({ categories, categoriesLoading: false });
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      set({ categoriesLoading: false });
+    }
+  },
 
-  updateCategory: (id, name) =>
-    set((state) => ({
-      categories: state.categories.map((cat) => {
-        if (cat.id === id) {
-          return { ...cat, name, slug: name.toLowerCase().replace(/\s+/g, '-') };
-        }
-        return {
-          ...cat,
-          subcategories: cat.subcategories?.map((sub) =>
-            sub.id === id ? { ...sub, name, slug: name.toLowerCase().replace(/\s+/g, '-') } : sub
-          ),
+  subscribeToCategories: () => {
+    const categoriesRef = collection(db, 'categories');
+    const unsubscribe = onSnapshot(categoriesRef, async (snapshot) => {
+      const categories: Category[] = [];
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        const category: Category = {
+          id: docSnap.id,
+          name: data.name,
+          slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
+          subcategories: [],
         };
-      }),
-    })),
 
-  deleteCategory: (id) =>
-    set((state) => ({
-      categories: state.categories
-        .filter((cat) => cat.id !== id)
-        .map((cat) => ({
-          ...cat,
-          subcategories: cat.subcategories?.filter((sub) => sub.id !== id),
-        })),
-    })),
+        // Fetch subcategories
+        const subcategoriesRef = collection(db, 'categories', docSnap.id, 'subcategories');
+        const subSnapshot = await getDocs(subcategoriesRef);
+        category.subcategories = subSnapshot.docs.map(subDoc => ({
+          id: subDoc.id,
+          name: subDoc.data().name,
+          slug: subDoc.data().slug || subDoc.data().name.toLowerCase().replace(/\s+/g, '-'),
+        }));
+
+        categories.push(category);
+      }
+
+      set({ categories, categoriesLoading: false });
+    });
+
+    return unsubscribe;
+  },
+
+  addCategory: async (name, parentId) => {
+    try {
+      const slug = name.toLowerCase().replace(/\s+/g, '-');
+      const id = `cat-${Date.now()}`;
+
+      if (parentId) {
+        // Add as subcategory
+        const subCategoryRef = doc(db, 'categories', parentId, 'subcategories', id);
+        await setDoc(subCategoryRef, { name, slug, createdAt: new Date() });
+      } else {
+        // Add as main category
+        const categoryRef = doc(db, 'categories', id);
+        await setDoc(categoryRef, { name, slug, createdAt: new Date() });
+      }
+
+      // Refresh categories
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Error adding category:', error);
+      throw error;
+    }
+  },
+
+  updateCategory: async (id, name, parentId) => {
+    try {
+      const slug = name.toLowerCase().replace(/\s+/g, '-');
+
+      if (parentId) {
+        // Update subcategory
+        const subCategoryRef = doc(db, 'categories', parentId, 'subcategories', id);
+        await updateDoc(subCategoryRef, { name, slug, updatedAt: new Date() });
+      } else {
+        // Update main category
+        const categoryRef = doc(db, 'categories', id);
+        await updateDoc(categoryRef, { name, slug, updatedAt: new Date() });
+      }
+
+      // Refresh categories
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      throw error;
+    }
+  },
+
+  deleteCategory: async (id, parentId) => {
+    try {
+      if (parentId) {
+        // Delete subcategory
+        const subCategoryRef = doc(db, 'categories', parentId, 'subcategories', id);
+        await deleteDoc(subCategoryRef);
+      } else {
+        // Delete main category and its subcategories
+        const subcategoriesRef = collection(db, 'categories', id, 'subcategories');
+        const subSnapshot = await getDocs(subcategoriesRef);
+
+        const batch = writeBatch(db);
+        subSnapshot.docs.forEach(subDoc => {
+          batch.delete(subDoc.ref);
+        });
+
+        const categoryRef = doc(db, 'categories', id);
+        batch.delete(categoryRef);
+
+        await batch.commit();
+      }
+
+      // Refresh categories
+      await get().fetchCategories();
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      throw error;
+    }
+  },
 
   feeds: mockFeeds,
 
@@ -128,3 +229,4 @@ export const useAdminStore = create<AdminState>((set) => ({
       ],
     })),
 }));
+

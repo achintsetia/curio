@@ -11,6 +11,15 @@ import {
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useAppStore } from '@/store/useAppStore';
 
 const adminNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
@@ -28,6 +37,7 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, title, description }: AdminLayoutProps) {
   const location = useLocation();
+  const { user, logout } = useAppStore();
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -76,7 +86,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
 
       {/* Main content */}
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center border-b border-border px-6">
+        <header className="flex h-16 items-center justify-between border-b border-border px-6">
           <div>
             <h1 className="font-display text-xl font-semibold text-foreground">
               {title}
@@ -85,6 +95,40 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
               <p className="text-sm text-muted-foreground">{description}</p>
             )}
           </div>
+
+          {/* User Menu */}
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-9 w-9 rounded-full p-0">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      referrerPolicy="no-referrer"
+                    />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                      {user.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-3 py-2">
+                  <p className="font-medium text-foreground">{user.name}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.location.href = '/'}>
+                  Back to Reader
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-destructive">
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </header>
 
         <main className="flex-1 overflow-auto p-6">{children}</main>
@@ -92,3 +136,4 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
     </div>
   );
 }
+

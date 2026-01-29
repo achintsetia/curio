@@ -48,6 +48,9 @@ export function TopNavBar() {
             <span className="font-display text-xl font-semibold text-foreground">
               Curio
             </span>
+            <span className="hidden text-sm italic text-muted-foreground sm:inline">
+              (curious, curated)
+            </span>
           </div>
         </div>
 
@@ -89,7 +92,11 @@ export function TopNavBar() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-9 w-9 rounded-full p-0">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarImage
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      referrerPolicy="no-referrer"
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                       {user.name.charAt(0)}
                     </AvatarFallback>
@@ -102,6 +109,14 @@ export function TopNavBar() {
                   <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
+                {user.is_admin && (
+                  <>
+                    <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
+                      Admin Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem>My Subscriptions</DropdownMenuItem>
                 <DropdownMenuItem>Reading History</DropdownMenuItem>
                 <DropdownMenuSeparator />

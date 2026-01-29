@@ -68,8 +68,22 @@ export const fetchRssFeeds = onSchedule({
 
         await Promise.all(articlePromises);
         console.log(`Fetched ${feed.items.length} items from ${feedName}. Added ${newArticlesCount} new articles.`);
+
+        // Update feed document with success status and stats
+        await db.collection("feeds").doc(doc.id).update({
+          status: "success",
+          last_runtime: admin.firestore.FieldValue.serverTimestamp(),
+          fresh_articles_count: newArticlesCount,
+        });
       } catch (err) {
         console.error(`Error parsing feed ${feedName} (${feedUrl}):`, err);
+
+        // Update feed document with failed status
+        await db.collection("feeds").doc(doc.id).update({
+          status: "failed",
+          last_runtime: admin.firestore.FieldValue.serverTimestamp(),
+          fresh_articles_count: 0,
+        });
       }
     });
 

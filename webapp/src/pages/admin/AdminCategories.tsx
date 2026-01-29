@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus,
   Pencil,
@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronDown,
   FolderPlus,
+  Loader2,
 } from 'lucide-react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useAdminStore } from '@/store/useAdminStore';
@@ -42,14 +43,16 @@ const categorySchema = z.object({
 
 interface CategoryRowProps {
   category: Category;
+  parentId?: string;
   level?: number;
-  onEdit: (category: Category) => void;
-  onDelete: (category: Category) => void;
+  onEdit: (category: Category, parentId?: string) => void;
+  onDelete: (category: Category, parentId?: string) => void;
   onAddSubcategory: (parentId: string) => void;
 }
 
 function CategoryRow({
   category,
+  parentId,
   level = 0,
   onEdit,
   onDelete,
@@ -99,7 +102,7 @@ function CategoryRow({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => onEdit(category)}
+            onClick={() => onEdit(category, parentId)}
           >
             <Pencil className="h-4 w-4" />
           </Button>
@@ -107,7 +110,7 @@ function CategoryRow({
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-destructive hover:text-destructive"
-            onClick={() => onDelete(category)}
+            onClick={() => onDelete(category, parentId)}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -120,6 +123,7 @@ function CategoryRow({
             <CategoryRow
               key={sub.id}
               category={sub}
+              parentId={category.id}
               level={level + 1}
               onEdit={onEdit}
               onDelete={onDelete}
@@ -133,33 +137,46 @@ function CategoryRow({
 }
 
 export default function AdminCategories() {
-  const { categories, addCategory, updateCategory, deleteCategory } = useAdminStore();
+  const { categories, categoriesLoading, fetchCategories, addCategory, updateCategory, deleteCategory } = useAdminStore();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedParentId, setSelectedParentId] = useState<string | undefined>();
   const [parentIdForNew, setParentIdForNew] = useState<string | undefined>();
   const [newName, setNewName] = useState('');
   const [editName, setEditName] = useState('');
   const [errors, setErrors] = useState<{ name?: string }>({});
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleCreate = () => {
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const handleCreate = async () => {
     const result = categorySchema.safeParse({ name: newName });
     if (!result.success) {
       setErrors({ name: result.error.errors[0].message });
       return;
     }
-    
-    addCategory(result.data.name, parentIdForNew);
-    toast.success(parentIdForNew ? 'Subcategory created' : 'Category created');
-    setIsCreateOpen(false);
-    setNewName('');
-    setParentIdForNew(undefined);
-    setErrors({});
+
+    setIsSaving(true);
+    try {
+      await addCategory(result.data.name, parentIdForNew);
+      toast.success(parentIdForNew ? 'Subcategory created' : 'Category created');
+      setIsCreateOpen(false);
+      setNewName('');
+      setParentIdForNew(undefined);
+      setErrors({});
+    } catch (error) {
+      toast.error('Failed to create category');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     const result = categorySchema.safeParse({ name: editName });
     if (!result.success) {
       setErrors({ name: result.error.errors[0].message });
@@ -167,33 +184,51 @@ export default function AdminCategories() {
     }
 
     if (selectedCategory) {
-      updateCategory(selectedCategory.id, result.data.name);
-      toast.success('Category updated');
-      setIsEditOpen(false);
-      setSelectedCategory(null);
-      setEditName('');
-      setErrors({});
+      setIsSaving(true);
+      try {
+        await updateCategory(selectedCategory.id, result.data.name, selectedParentId);
+        toast.success('Category updated');
+        setIsEditOpen(false);
+        setSelectedCategory(null);
+        setSelectedParentId(undefined);
+        setEditName('');
+        setErrors({});
+      } catch (error) {
+        toast.error('Failed to update category');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedCategory) {
-      deleteCategory(selectedCategory.id);
-      toast.success('Category deleted');
-      setIsDeleteOpen(false);
-      setSelectedCategory(null);
+      setIsSaving(true);
+      try {
+        await deleteCategory(selectedCategory.id, selectedParentId);
+        toast.success('Category deleted');
+        setIsDeleteOpen(false);
+        setSelectedCategory(null);
+        setSelectedParentId(undefined);
+      } catch (error) {
+        toast.error('Failed to delete category');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
-  const openEdit = (category: Category) => {
+  const openEdit = (category: Category, parentId?: string) => {
     setSelectedCategory(category);
+    setSelectedParentId(parentId);
     setEditName(category.name);
     setErrors({});
     setIsEditOpen(true);
   };
 
-  const openDelete = (category: Category) => {
+  const openDelete = (category: Category, parentId?: string) => {
     setSelectedCategory(category);
+    setSelectedParentId(parentId);
     setIsDeleteOpen(true);
   };
 
@@ -229,17 +264,27 @@ export default function AdminCategories() {
             <CardTitle>Category Tree</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
-              {categories.map((category) => (
-                <CategoryRow
-                  key={category.id}
-                  category={category}
-                  onEdit={openEdit}
-                  onDelete={openDelete}
-                  onAddSubcategory={openAddSubcategory}
-                />
-              ))}
-            </div>
+            {categoriesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : categories.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No categories found. Click "Add Category" to create one.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {categories.map((category) => (
+                  <CategoryRow
+                    key={category.id}
+                    category={category}
+                    onEdit={openEdit}
+                    onDelete={openDelete}
+                    onAddSubcategory={openAddSubcategory}
+                  />
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -276,10 +321,13 @@ export default function AdminCategories() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleCreate}>Create</Button>
+            <Button onClick={handleCreate} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -312,10 +360,13 @@ export default function AdminCategories() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleEdit}>Save Changes</Button>
+            <Button onClick={handleEdit} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -331,11 +382,13 @@ export default function AdminCategories() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isSaving}
             >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -344,3 +397,4 @@ export default function AdminCategories() {
     </AdminLayout>
   );
 }
+

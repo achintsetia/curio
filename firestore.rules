@@ -2,6 +2,47 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null 
+             && exists(/databases/$(database)/documents/user_profile/$(request.auth.token.email))
+             && get(/databases/$(database)/documents/user_profile/$(request.auth.token.email)).data.is_admin == true;
+    }
+    
+    // User profiles - users can read/write their own profile using email as document ID
+    match /user_profile/{email} {
+      // Allow users to read their own profile
+      allow read: if request.auth != null && request.auth.token.email == email;
+      
+      // Allow users to create their own profile
+      allow create: if request.auth != null && request.auth.token.email == email;
+      
+      // Allow users to update their own profile (but not change is_admin to true)
+      allow update: if request.auth != null 
+                    && request.auth.token.email == email
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['is_admin']) 
+                        || resource.data.is_admin == true);
+      
+      // Admins can read all profiles
+      allow read: if isAdmin();
+    }
+    
+    // Categories - all authenticated users can read, only admins can write
+    match /categories/{categoryId} {
+      // Anyone authenticated can read categories
+      allow read: if request.auth != null;
+      
+      // Only admins can create, update, delete categories
+      allow create, update, delete: if isAdmin();
+      
+      // Subcategories have the same rules
+      match /subcategories/{subcategoryId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if isAdmin();
+      }
+    }
+    
+    // Default deny all other access
     match /{document=**} {
       allow read, write: if false;
     }

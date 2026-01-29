@@ -23,6 +23,7 @@ export interface User {
   email: string;
   avatarUrl: string;
   subscribedCategories: string[];
+  is_admin: boolean;
 }
 
 export interface Notification {
