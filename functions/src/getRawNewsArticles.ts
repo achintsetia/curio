@@ -1,4 +1,4 @@
-import { onRequest } from "firebase-functions/v2/https";
+import {onRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 
 if (admin.apps.length === 0) {
@@ -22,7 +22,7 @@ interface RawNewsArticle {
  * Intended for AI bot consumption.
  * Returns up to 50 articles at a time.
  */
-export const getRawNewsArticles = onRequest({ cors: true }, async (_req, res) => {
+export const getRawNewsArticles = onRequest({cors: true}, async (_req, res) => {
   try {
     const limit = 50;
     const thirtyDaysAgo = new Date();
@@ -32,7 +32,6 @@ export const getRawNewsArticles = onRequest({ cors: true }, async (_req, res) =>
     // This requires a composite index in firestore.indexes.json
     const snapshot = await db.collection("rawnews")
       .where("isProcessed", "==", false)
-      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(thirtyDaysAgo))
       .orderBy("timestamp", "asc")
       .limit(limit)
       .get();
@@ -56,6 +55,6 @@ export const getRawNewsArticles = onRequest({ cors: true }, async (_req, res) =>
     });
   } catch (error) {
     console.error("Error fetching raw news articles:", error);
-    res.status(500).json({ error: "Failed to fetch raw news articles" });
+    res.status(500).json({error: "Failed to fetch raw news articles"});
   }
 });

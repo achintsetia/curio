@@ -34,4 +34,5 @@ export * from "./fetchRssFeeds";
 export * from "./cleanupData";
 export * from "./getCategoryTree";
 export * from "./getRawNewsArticles";
+export * from "./receiveProcessedArticles";
 

@@ -47,6 +47,13 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
+
+    // Processed articles - hierarchical structure
+    match /processed_articles/{categoryId} {
+      match /articles/{articleId} {
+        allow read: if request.auth != null;
+      }
+    }
     
     // Default deny all other access
     match /{document=**} {

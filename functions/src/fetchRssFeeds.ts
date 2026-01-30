@@ -1,4 +1,4 @@
-import { onSchedule } from "firebase-functions/v2/scheduler";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import Parser from "rss-parser";
 
