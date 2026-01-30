@@ -40,13 +40,15 @@ export const receiveProcessedArticles = onRequest({cors: true}, async (req, res)
       return;
     }
 
+    // Reduced batch size to 100 to avoid "Transaction too big" error
+    // Each article has embeddings and summaries which can be large in bytes
     const batches: admin.firestore.WriteBatch[] = [db.batch()];
     let currentBatchIndex = 0;
     let operationCount = 0;
 
     const commitBatchIfFull = async () => {
       operationCount++;
-      if (operationCount >= 500) {
+      if (operationCount >= 100) {
         batches.push(db.batch());
         currentBatchIndex++;
         operationCount = 0;
@@ -87,8 +89,10 @@ export const receiveProcessedArticles = onRequest({cors: true}, async (req, res)
       processedCount++;
     }
 
-    // Commit all batches
-    await Promise.all(batches.map((batch) => batch.commit()));
+    // Commit all batches sequentially to avoid overloading
+    for (const batch of batches) {
+      await batch.commit();
+    }
 
     console.log(`Successfully processed ${processedCount} articles across ${locationCount} category locations.`);
     res.json({

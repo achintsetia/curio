@@ -20,11 +20,11 @@ interface RawNewsArticle {
 /**
  * HTTP function to fetch unprocessed raw news articles.
  * Intended for AI bot consumption.
- * Returns up to 50 articles at a time.
+ * Returns up to 10 articles at a time.
  */
 export const getRawNewsArticles = onRequest({cors: true}, async (_req, res) => {
   try {
-    const limit = 50;
+    const limit = 10;
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
